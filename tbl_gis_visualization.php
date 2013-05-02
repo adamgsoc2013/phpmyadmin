@@ -27,7 +27,7 @@ if (! isset($sql_query) || $sql_query == '') {
 }
 
 // Execute the query and return the result
-$result = PMA_DBI_try_query($sql_query);
+$result = PMA_DBI_tryQuery($sql_query);
 // Get the meta data of results
 $meta = PMA_DBI_get_fields_meta($result);
 
@@ -58,7 +58,7 @@ if (! isset($visualizationSettings['spatialColumn'])) {
 
 // Convert geometric columns from bytes to text.
 $modified_query = PMA_GIS_modifyQuery($sql_query, $visualizationSettings);
-$modified_result = PMA_DBI_try_query($modified_query);
+$modified_result = PMA_DBI_tryQuery($modified_query);
 
 $data = array();
 while ($row = PMA_DBI_fetch_assoc($modified_result)) {
@@ -108,7 +108,7 @@ $visualization = PMA_GIS_visualizationResults(
  * Displays the page
  */
 ?>
-<!-- Display visulalization options -->
+<!-- Display visualization options -->
 <div id="div_view_options">
 <fieldset>
     <legend><?php echo __('Display GIS Visualization'); ?></legend>
@@ -149,17 +149,22 @@ foreach ($spatialCandidates as $spatialCandidate) {
     <tr><td></td>
         <td class="button"><input type="submit" name="displayVisualizationBtn" value="<?php echo __('Redraw'); ?>" /></td>
     </tr>
+<?php
+if (! $GLOBALS['PMA_Config']->isHttps()) {
+    ?>
     <tr><td class="choice" colspan="2">
         <input type="checkbox" name="visualizationSettings[choice]" id="choice" value="useBaseLayer"
-        <?php
-
-if (isset($visualizationSettings['choice'])) {
-    echo(' checked="checked"');
-}
-        ?>
+    <?php
+    if (isset($visualizationSettings['choice'])) {
+        echo(' checked="checked"');
+    }
+    ?>
         />
         <label for="choice"><?php echo __("Use OpenStreetMaps as Base Layer"); ?></label>
     </td></tr>
+    <?php
+}
+?>
     </table>
     <input type="hidden" name="displayVisualization" value="redraw">
     <input type="hidden" name="sql_query" value="<?php echo htmlspecialchars($sql_query); ?>" />
@@ -196,7 +201,7 @@ if ($svg_support) {
 
     <div style="clear:both;">&nbsp;</div>
 
-    <div id="placeholder" style="width:<?php echo($visualizationSettings['width']); ?>px;height:<?php echo($visualizationSettings['height']); ?>px;">
+    <div id="placeholder" style="width:<?php echo htmlspecialchars($visualizationSettings['width']); ?>px;height:<?php echo htmlspecialchars($visualizationSettings['height']); ?>px;">
         <?php echo $visualization; ?>
     </div>
     <div id="openlayersmap"></div>
@@ -204,7 +209,11 @@ if ($svg_support) {
     <script language="javascript" type="text/javascript">
         function drawOpenLayers()
         {
-            <?php echo (PMA_GIS_visualizationResults($data, $visualizationSettings, 'ol')); ?>
+            <?php
+            if (! $GLOBALS['PMA_Config']->isHttps()) {
+                echo (PMA_GIS_visualizationResults($data, $visualizationSettings, 'ol'));
+            }
+            ?>
         }
     </script>
 </fieldset>

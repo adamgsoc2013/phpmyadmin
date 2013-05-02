@@ -15,7 +15,7 @@ require_once 'libraries/tbl_common.inc.php';
 
 // Get fields and stores their name/type
 $fields = array();
-foreach (PMA_DBI_get_columns_full($db, $table) as $row) {
+foreach (PMA_DBI_getColumnsFull($db, $table) as $row) {
     if (preg_match('@^(set|enum)\((.+)\)$@i', $row['Type'], $tmp)) {
         $tmp[2] = substr(
             preg_replace('@([^,])\'\'@', '\\1\\\'', ',' . $tmp[2]), 1
@@ -99,7 +99,11 @@ if (isset($_REQUEST['do_save_data'])) {
         $sql_query .= ' (' . implode(', ', $index_fields) . ')';
     }
 
-    $sql_query .= "COMMENT '" . PMA_Util::sqlAddSlashes($index->getComment()) . "'";
+    if (PMA_MYSQL_INT_VERSION > 50500) {
+        $sql_query .= "COMMENT '" 
+            . PMA_Util::sqlAddSlashes($index->getComment()) 
+            . "'";
+    }
     $sql_query .= ';';
 
     if (! $error) {
@@ -220,6 +224,9 @@ echo PMA_Util::showHint(
             value="<?php echo htmlspecialchars($index->getName()); ?>"
             onfocus="this.select()" />
     </div>
+<?php
+if (PMA_MYSQL_INT_VERSION > 50500) {
+?>
     <div>
         <div class="label">
             <strong>
@@ -232,6 +239,9 @@ echo PMA_Util::showHint(
             value="<?php echo htmlspecialchars($index->getComment()); ?>"
             onfocus="this.select()" />
     </div>
+<?php
+}
+?>
     <div>
         <div class="label">
             <strong>

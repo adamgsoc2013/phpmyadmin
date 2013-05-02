@@ -122,6 +122,8 @@ if (isset($_REQUEST['submitoptions'])) {
                 : '1';
             $page_checksum = (isset($page_checksum)) ? $page_checksum : '';
         }
+    } else {
+        $new_tbl_storage_engine = '';
     }
 
     $table_alters = PMA_getTableAltersArray(
@@ -223,7 +225,7 @@ $url_params['goto']
 /**
  * Get columns names
  */
-$columns = PMA_DBI_get_columns($GLOBALS['db'], $GLOBALS['table']);
+$columns = PMA_DBI_getColumns($GLOBALS['db'], $GLOBALS['table']);
 
 /**
  * Displays the page

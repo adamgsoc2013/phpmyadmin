@@ -143,13 +143,13 @@ if (isset($destination) && $cfgRelation['relwork']) {
 // u p d a t e s    f o r    f o r e i g n    k e y s
 // (for now, one index name only; we keep the definitions if the
 // foreign db is not the same)
-// I use $sql_query to be able to display directly the query via
-// getMessage()
 
 if (isset($_REQUEST['destination_foreign'])) {
     $display_query = '';
     $seen_error = false;
     foreach ($_REQUEST['destination_foreign'] as $master_field_md5 => $foreign_string) {
+        $create = false;
+        $drop = false;
 
         // Map the fieldname's md5 back to it's real name
         $master_field = $multi_edit_columns_name[$master_field_md5];
@@ -157,139 +157,99 @@ if (isset($_REQUEST['destination_foreign'])) {
         if (! empty($foreign_string)) {
             list($foreign_db, $foreign_table, $foreign_field)
                 = PMA_backquoteSplit($foreign_string);
-
-            if ( isset($existrel_foreign[$master_field])
-                && ( PMA_Util::backquote($existrel_foreign[$master_field]['foreign_db']) != $foreign_db
+            if (! isset($existrel_foreign[$master_field])) {
+                // no key defined for this field
+                $create = true;
+            } elseif (PMA_Util::backquote($existrel_foreign[$master_field]['foreign_db']) != $foreign_db
                 || PMA_Util::backquote($existrel_foreign[$master_field]['foreign_table']) != $foreign_table
                 || PMA_Util::backquote($existrel_foreign[$master_field]['foreign_field']) != $foreign_field
                 || $_REQUEST['constraint_name'][$master_field_md5] != $existrel_foreign[$master_field]['constraint']
                 || ($_REQUEST['on_delete'][$master_field_md5] != (! empty($existrel_foreign[$master_field]['on_delete']) ? $existrel_foreign[$master_field]['on_delete'] : 'RESTRICT'))
-                || ($_REQUEST['on_update'][$master_field_md5] != (! empty($existrel_foreign[$master_field]['on_update']) ? $existrel_foreign[$master_field]['on_update'] : 'RESTRICT')))
+                || ($_REQUEST['on_update'][$master_field_md5] != (! empty($existrel_foreign[$master_field]['on_update']) ? $existrel_foreign[$master_field]['on_update'] : 'RESTRICT'))
             ) {
                 // another foreign key is already defined for this field
-                // or
-                // an option has been changed for ON DELETE or ON UPDATE
-                // remove existing key 
-                $sql_query_drop  = 'ALTER TABLE ' . PMA_Util::backquote($table)
-                    . ' DROP FOREIGN KEY '
-                    . PMA_Util::backquote(
-                        $existrel_foreign[$master_field]['constraint']
-                    );
-                $sql_query_drop .= ';';
-                $display_query .= $sql_query_drop . "\n";
-            } // end if...
-
-            // The next few lines are repeated below, so they
-            // could be put in an include file
-            // Note: I tried to enclose the db and table name with
-            // backquotes but MySQL 4.0.16 did not like the syntax
-            // (for example: `base2`.`table1`)
-            $sql_query  = 'ALTER TABLE ' . PMA_Util::backquote($table) . ' ADD ';
-            // if user entered a constraint name
-            if (! empty($_REQUEST['constraint_name'][$master_field_md5])) {
-                $sql_query .= ' CONSTRAINT ' . PMA_Util::backquote(
-                    $_REQUEST['constraint_name'][$master_field_md5]
-                );
-            }
-            $sql_query .= ' FOREIGN KEY ('
-                . PMA_Util::backquote($master_field) . ')'
-                . ' REFERENCES ' . $foreign_db . '.' . $foreign_table
-                . '(' . $foreign_field . ')';
-            if (! empty($_REQUEST['on_delete'][$master_field_md5])) {
-                $sql_query .= ' ON DELETE '
-                    . $options_array[$_REQUEST['on_delete'][$master_field_md5]];
-            }
-            if (! empty($_REQUEST['on_update'][$master_field_md5])) {
-                $sql_query .= ' ON UPDATE '
-                    . $options_array[$_REQUEST['on_update'][$master_field_md5]];
-            }
-            $sql_query .= ';';
-            $display_query .= $sql_query . "\n";
-
+                // or an option has been changed for ON DELETE or ON UPDATE
+                $drop = true;
+                $create = true;
+            } // end if... else....
         } elseif (isset($existrel_foreign[$master_field])) {
-            $sql_query  = 'ALTER TABLE ' . PMA_Util::backquote($table)
-                . ' DROP FOREIGN KEY '
-                . PMA_Util::backquote(
-                    $existrel_foreign[$master_field]['constraint']
-                );
-            $sql_query .= ';';
-            $display_query .= $sql_query . "\n";
+            $drop = true;
         } // end if... else....
 
-        if (! empty($sql_query)) {
-            if (! empty($sql_query_drop)) {
-                PMA_DBI_try_query($sql_query_drop);
-                $tmp_error_drop = PMA_DBI_getError();
-            }
-            PMA_DBI_try_query($sql_query);
-            $tmp_error = PMA_DBI_getError();
-            if (! empty($tmp_error)) {
+        $tmp_error_drop = false;
+        if ($drop) {
+            $drop_query = PMA_getSQLToDropForeignKey(
+                $table, $existrel_foreign[$master_field]['constraint']
+            );
+            $display_query .= $drop_query . "\n";
+            PMA_DBI_tryQuery($drop_query);
+            $tmp_error_drop = PMA_DBI_getError();
+
+            if (! empty($tmp_error_drop)) {
                 $seen_error = true;
+                $html_output .= PMA_Util::mysqlDie(
+                    $tmp_error_drop, $drop_query, false, '', false
+                );
+                continue;
+            }
+        }
+        $tmp_error_create = false;
+        if ($create) {
+            $create_query = PMA_getSQLToCreateForeignKey(
+                $table, $master_field, $foreign_db, $foreign_table, $foreign_field,
+                $_REQUEST['constraint_name'][$master_field_md5],
+                $options_array[$_REQUEST['on_delete'][$master_field_md5]],
+                $options_array[$_REQUEST['on_update'][$master_field_md5]]
+            );
+
+            $display_query .= $create_query . "\n";
+            PMA_DBI_tryQuery($create_query);
+            $tmp_error_create = PMA_DBI_getError();
+            if (! empty($tmp_error_create)) {
+                $seen_error = true;
+
+                if (substr($tmp_error_create, 1, 4) == '1005') {
+                    $message = PMA_Message::error(
+                        __('Error creating foreign key on %1$s (check data types)')
+                    );
+                    $message->addParam($master_field);
+                    $message->display();
+                } else {
+                    $html_output .= PMA_Util::mysqlDie(
+                        $tmp_error_create, $create_query, false, '', false
+                    );
+                }
+                $html_output .= PMA_Util::showMySQLDocu(
+                    'manual_Table_types', 'InnoDB_foreign_key_constraints'
+                ) . "\n";
             }
 
-            if (substr($tmp_error, 1, 4) == '1216'
-                ||  substr($tmp_error, 1, 4) == '1452'
+            // this is an alteration and the old constraint has been dropped
+            // without creation of a new one
+            if ($drop && $create && empty($tmp_error_drop)
+                && ! empty($tmp_error_create)
             ) {
-                PMA_Util::mysqlDie($tmp_error, $sql_query, false, '', false);
-                $html_output .= PMA_Util::showMySQLDocu(
-                    'manual_Table_types', 'InnoDB_foreign_key_constraints'
-                ) . "\n";
-            }
-            if (substr($tmp_error, 1, 4) == '1005') {
-                $message = PMA_Message::error(
-                    __('Error creating foreign key on %1$s (check data types)')
-                );
-                $message->addParam($master_field);
-                $message->display();
-                $html_output .= PMA_Util::showMySQLDocu(
-                    'manual_Table_types', 'InnoDB_foreign_key_constraints'
-                ) . "\n";
-            }
-            if (! empty($tmp_error) && empty($tmp_error_drop)) {
-                // constraint might be dropped without creation of a new one
                 // a rollback may be better here
-                $sql_query_recreate = 'ALTER TABLE ' . PMA_Util::backquote($table)
-                    . ' ADD '
-                    . ' CONSTRAINT ' . PMA_Util::backquote(
-                        $existrel_foreign[$master_field]['constraint']
-                    )
-                    . ' FOREIGN KEY (' . PMA_Util::backquote($master_field) . ')'
-                    . ' REFERENCES ' . PMA_Util::backquote(
-                        $existrel_foreign[$master_field]['foreign_db']
-                    )
-                    . '.' . PMA_Util::backquote(
-                        $existrel_foreign[$master_field]['foreign_table']
-                    )
-                    . '(' . PMA_Util::backquote(
-                        $existrel_foreign[$master_field]['foreign_field']
-                    )
-                    . ')';
-                if (! empty($existrel_foreign[$master_field]['on_delete'])) {
-                    $sql_query_recreate .= ' ON DELETE '
-                        . $existrel_foreign[$master_field]['on_delete'];
-                }
-                if (! empty($existrel_foreign[$master_field]['on_update'])) {
-                    $sql_query_recreate .= ' ON UPDATE '
-                        . $existrel_foreign[$master_field]['on_update'];
-                }
-                $sql_query_recreate .= ';';
-                PMA_DBI_try_query($sql_query_recreate);
-                unset($sql_query_recreate);
+                $sql_query_recreate = '# Restoring the dropped constraint...' . "\n";
+                $sql_query_recreate .= PMA_getSQLToCreateForeignKey(
+                    $table, $master_field,
+                    PMA_Util::backquote($existrel_foreign[$master_field]['foreign_db']),
+                    PMA_Util::backquote($existrel_foreign[$master_field]['foreign_table']),
+                    PMA_Util::backquote($existrel_foreign[$master_field]['foreign_field']),
+                    $existrel_foreign[$master_field]['constraint'],
+                    $options_array[$existrel_foreign[$master_field]['on_delete']],
+                    $options_array[$existrel_foreign[$master_field]['on_update']]
+                );
+                $display_query .= $sql_query_recreate . "\n";
+                PMA_DBI_tryQuery($sql_query_recreate);
             }
-            unset($tmp_error);
-            unset($tmp_error_drop);
-            $sql_query = '';
         }
     } // end foreach
-    if (!empty($display_query)) {
-        if ($seen_error) {
-            $html_output .= PMA_Util::getMessage(__('Error'), null, 'error');
-        } else {
-            $html_output .= PMA_Util::getMessage(
-                __('Your SQL query has been executed successfully'),
-                null, 'success'
-            );
-        }
+    if (! empty($display_query) && ! $seen_error) {
+        $html_output .= PMA_Util::getMessage(
+            __('Your SQL query has been executed successfully'),
+            null, 'success'
+        );
     }
 } // end if isset($destination_foreign)
 
@@ -403,20 +363,20 @@ if ($cfgRelation['relwork']
 
 // Now find out the columns of our $table
 // need to use PMA_DBI_QUERY_STORE with PMA_DBI_num_rows() in mysqli
-$columns = PMA_DBI_get_columns($db, $table);
+$columns = PMA_DBI_getColumns($db, $table);
 
 if (count($columns) > 0) {
-    
+
     foreach ($columns as $row) {
         $save_row[] = $row;
     }
-    
+
     $saved_row_cnt  = count($save_row);
     $html_output .= '<fieldset>'
         . '<legend>' . __('Relations'). '</legend>'
         . '<table>'
         . '<tr><th>' . __('Column') . '</th>';
-    
+
     if ($cfgRelation['relwork']) {
         $html_output .= '<th>' . __('Internal relation');
         if (PMA_Util::isForeignKeySupported($tbl_storage_engine)) {
@@ -429,7 +389,7 @@ if (count($columns) > 0) {
         }
         $html_output .= '</th>';
     }
-    
+
     if (PMA_Util::isForeignKeySupported($tbl_storage_engine)) {
         // this does not have to be translated, it's part of the MySQL syntax
         $html_output .= '<th colspan="2">' . __('Foreign key constraint')
@@ -581,11 +541,11 @@ if (count($columns) > 0) {
         // Get "display_field" infos
         $disp = PMA_getDisplayField($db, $table);
         $html_output .= '<fieldset>'
-            . '<label>' . __('Choose column to display') . ': </label>'
+            . '<label>' . __('Choose column to display:') . '</label>'
             . '<select name="display_field">'
             . '<option value="">---</option>';
 
-        foreach ($save_row AS $row) {
+        foreach ($save_row as $row) {
             $html_output .= '<option value="'
                 . htmlspecialchars($row['Field']) . '"';
             if (isset($disp) && $row['Field'] == $disp) {
@@ -605,7 +565,10 @@ if (count($columns) > 0) {
         . '</form>';
 } // end if (we have columns in this table)
 
-$html_output .= '<div id="index_div" class="ajax" >'. PMA_getHtmlForDisplayIndexes();
+if (PMA_Util::isForeignKeySupported($tbl_storage_engine)) {
+    $html_output .= '<div id="index_div" class="ajax" >'
+        . PMA_getHtmlForDisplayIndexes();
+}
 // Render HTML output
 PMA_Response::getInstance()->addHTML($html_output);
 
@@ -635,7 +598,7 @@ function PMA_generateDropdown(
         $html_output .= '>' . htmlspecialchars($one_label) . '</option>' . "\n";
     }
     $html_output .= '</select>' . "\n";
-    
+
     return $html_output;
 }
 
@@ -670,5 +633,57 @@ function PMA_backquoteSplit($text)
         $pos = $second_backquote + 1;
     }
     return($elements);
+}
+
+/**
+ * Returns the DROP query for a foreign key constraint
+ *
+ * @param string $table table of the foreign key
+ * @param string $fk    foreign key name
+ *
+ * @return string DROP query for the foreign key constraint
+ */
+function PMA_getSQLToDropForeignKey($table, $fk)
+{
+    return 'ALTER TABLE ' . PMA_Util::backquote($table)
+        . ' DROP FOREIGN KEY ' . PMA_Util::backquote($fk) . ';';
+}
+
+/**
+ * Returns the SQL query for foreign key constraint creation
+ *
+ * @param string $table        table name
+ * @param string $field        field name
+ * @param string $foreignDb    back-quoted foreign database name
+ * @param string $foreignTable back-quoted foreign table name
+ * @param string $foreignField back-quoted foreign field name
+ * @param string $name         name of the constraint
+ * @param string $onDelete     on delete action
+ * @param string $onUpdate     on update action
+ *
+ * @return string SQL query for foreign key constraint creation
+ */
+function PMA_getSQLToCreateForeignKey($table, $field, $foreignDb, $foreignTable,
+    $foreignField, $name = null, $onDelete = null, $onUpdate = null
+) {
+    $sql_query  = 'ALTER TABLE ' . PMA_Util::backquote($table) . ' ADD ';
+    // if user entered a constraint name
+    if (! empty($name)) {
+        $sql_query .= ' CONSTRAINT ' . PMA_Util::backquote($name);
+    }
+
+    $sql_query .= ' FOREIGN KEY (' . PMA_Util::backquote($field) . ')'
+        . ' REFERENCES ' . $foreignDb . '.' . $foreignTable
+        . '(' . $foreignField . ')';
+
+    if (! empty($onDelete)) {
+        $sql_query .= ' ON DELETE ' . $onDelete;
+    }
+    if (! empty($onUpdate)) {
+        $sql_query .= ' ON UPDATE ' . $onUpdate;
+    }
+    $sql_query .= ';';
+
+    return $sql_query;
 }
 ?>

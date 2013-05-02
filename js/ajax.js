@@ -34,11 +34,11 @@ var AJAX = {
      *
      * @return int
      */
-    hash: function (key){
+    hash: function (key) {
         /* http://burtleburtle.net/bob/hash/doobs.html#one */
         key += "";
-        var len = key.length, hash=0, i=0;
-        for (; i<len; ++i) {
+        var len = key.length, hash = 0, i = 0;
+        for (; i < len; ++i) {
             hash += key.charCodeAt(i);
             hash += (hash << 10);
             hash ^= (hash >> 6);
@@ -142,7 +142,7 @@ var AJAX = {
             event.preventDefault();
             event.stopImmediatePropagation();
         }
-        if (AJAX.active == true) {
+        if (AJAX.active === true) {
             // Silently bail out, there is already a request in progress.
             // TODO: save a reference to the request and cancel the old request
             // when the user requests something else. Something like this is
@@ -163,11 +163,11 @@ var AJAX = {
         // Add a list of menu hashes that we have in the cache to the request
         params += AJAX.cache.menus.getRequestParam();
 
-        this._debug && console.log("Loading: " + url); // no need to translate
+        AJAX._debug && console.log("Loading: " + url); // no need to translate
 
         if (isLink) {
             AJAX.active = true;
-            this.$msgbox = PMA_ajaxShowMessage();
+            AJAX.$msgbox = PMA_ajaxShowMessage();
             $.get(url, params, AJAX.responseHandler);
         } else {
             /**
@@ -180,7 +180,7 @@ var AJAX = {
             // or if it returns a value that evaluates to true
             if (typeof onsubmit !== 'function' || onsubmit.apply(this, [event])) {
                 AJAX.active = true;
-                this.$msgbox = PMA_ajaxShowMessage();
+                AJAX.$msgbox = PMA_ajaxShowMessage();
                 $.post(url, params, AJAX.responseHandler);
             }
         }
@@ -277,7 +277,7 @@ var AJAX = {
 
                 $('#pma_errors').remove();
                 if (data._errors) {
-                    $('<div/>', {id:'pma_errors'})
+                    $('<div/>', {id : 'pma_errors'})
                         .insertAfter('#selflink')
                         .append(data._errors);
                 }
@@ -475,7 +475,7 @@ AJAX.cache = {
         if (this.pages.length > AJAX.cache.MAX) {
             // Trim the cache, to the maximum number of allowed entries
             // This way we will have a cached menu for every page
-            for (var i=0; i<this.pages.length-this.MAX; i++) {
+            for (var i = 0; i < this.pages.length - this.MAX; i++) {
                 delete this.pages[i];
             }
         }
@@ -516,7 +516,7 @@ AJAX.cache = {
     navigate: function (index) {
         if (typeof this.pages[index] === 'undefined') {
             PMA_ajaxShowMessage(
-                '<div class="error">' + PMA_messages['strInvalidPage'] + '</div>',
+                '<div class="error">' + PMA_messages.strInvalidPage + '</div>',
                 false
             );
         } else {
@@ -553,7 +553,7 @@ AJAX.cache = {
          *
          * @return int
          */
-        size: function(obj) {
+        size: function (obj) {
             var size = 0, key;
             for (key in obj) {
                 if (obj.hasOwnProperty(key)) {
@@ -671,6 +671,15 @@ AJAX.setUrlHash = (function (jQuery, window) {
      */
     var userChange = true;
 
+    // Fix favicon disappearing in Firefox when setting location.hash
+    function resetFavicon() {
+        if (jQuery.browser.mozilla) {
+            // Move the link tags for the favicon to the bottom
+            // of the head element to force a reload of the favicon
+            $('head > link[href=favicon\\.ico]').appendTo('head');
+        }
+    }
+
     /**
      * Sets the hash part of the URL
      *
@@ -688,6 +697,7 @@ AJAX.setUrlHash = (function (jQuery, window) {
         userChange = false;
         if (ready) {
             window.location.hash = "PMAURL-" + index + ":" + hash;
+            resetFavicon();
         } else {
             savedHash = "PMAURL-" + index + ":" + hash;
         }
@@ -704,11 +714,12 @@ AJAX.setUrlHash = (function (jQuery, window) {
     } else {
         // We don't have a valid hash, so we'll set it up
         // when the page finishes loading
-        jQuery(function(){
+        jQuery(function () {
             /* Check if we should set URL */
-            if (savedHash != "") {
+            if (savedHash !== "") {
                 window.location.hash = savedHash;
                 savedHash = "";
+                resetFavicon();
             }
             // Indicate that we're done initialising
             ready = true;
@@ -717,7 +728,7 @@ AJAX.setUrlHash = (function (jQuery, window) {
     /**
      * Register an event handler for when the url hash changes
      */
-    jQuery(function(){
+    jQuery(function () {
         jQuery(window).hashchange(function () {
             if (userChange === false) {
                 // Ignore internally triggered hash changes
@@ -777,13 +788,13 @@ $('form').live('submit', AJAX.requestHandler);
  * Gracefully handle fatal server errors
  * (e.g: 500 - Internal server error)
  */
-$(document).ajaxError(function(event, request, settings){
+$(document).ajaxError(function (event, request, settings) {
     if (request.status !== 0) { // Don't handle aborted requests
-        var errorCode = $.sprintf(PMA_messages['strErrorCode'], request.status);
-        var errorText = $.sprintf(PMA_messages['strErrorText'], request.statusText);
+        var errorCode = $.sprintf(PMA_messages.strErrorCode, request.status);
+        var errorText = $.sprintf(PMA_messages.strErrorText, request.statusText);
         PMA_ajaxShowMessage(
             '<div class="error">'
-            + PMA_messages['strErrorProcessingRequest']
+            + PMA_messages.strErrorProcessingRequest
             + '<div>' + errorCode + '</div>'
             + '<div>' + errorText + '</div>'
             + '</div>',

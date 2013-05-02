@@ -30,9 +30,9 @@ require_once './libraries/Partition.class.php';
 /**
  * We are in transition between old-style echo and new-style PMA_Response
  * so this script generates $html and at the bottom, either echos it
- * or uses addHTML on it. 
+ * or uses addHTML on it.
  *
- * Initialize $html in case this variable was used by a caller 
+ * Initialize $html in case this variable was used by a caller
  * (yes, this script should be refactored into functions)
  */
 $html = '';
@@ -116,7 +116,7 @@ $header_cells[] = __('Attributes');
 $header_cells[] = __('Null');
 
 // We could remove this 'if' and let the key information be shown and
-// editable. However, for this to work, structure.lib.php must be modified 
+// editable. However, for this to work, structure.lib.php must be modified
 // to use the key fields, as tbl_addfield does.
 
 if (! $is_backup) {
@@ -137,11 +137,12 @@ $header_cells[] = __('Comments');
 
 if (isset($fields_meta)) {
     // for moving, load all available column names
-    $move_columns_sql_query    = 'SELECT * FROM ' 
+    $move_columns_sql_query    = 'SELECT * FROM '
         . PMA_Util::backquote($db)
         . '.'
-        . PMA_Util::backquote($table);
-    $move_columns_sql_result = PMA_DBI_try_query($move_columns_sql_query);
+        . PMA_Util::backquote($table)
+        . ' LIMIT 1';
+    $move_columns_sql_result = PMA_DBI_tryQuery($move_columns_sql_query);
     $move_columns = PMA_DBI_get_fields_meta($move_columns_sql_result);
     unset($move_columns_sql_query, $move_columns_sql_result);
 
@@ -446,7 +447,8 @@ for ($i = 0; $i < $num_fields; $i++) {
     }
 
     $content_cells[$i][$ci] = '<select name="field_default_type[' . $i
-        . ']" class="default_type">';
+        . ']" id="field_' . $i . '_' . ($ci - $ci_offset)
+        . '" class="default_type">';
     foreach ($default_options as $key => $value) {
         $content_cells[$i][$ci] .= '<option value="' . $key . '"';
         // is only set when we go back to edit a field's structure
@@ -457,8 +459,8 @@ for ($i = 0; $i < $num_fields; $i++) {
     }
     $content_cells[$i][$ci] .= '</select>';
     $content_cells[$i][$ci] .= '<br />';
-    $content_cells[$i][$ci] .= '<input id="field_' . $i . '_' . ($ci - $ci_offset)
-        . '"' . ' type="text" name="field_default_value[' . $i . ']" size="12"'
+    $content_cells[$i][$ci] .= '<input type="text"'
+        . ' name="field_default_value[' . $i . ']" size="12"'
         . ' value="' . (isset($row['DefaultValue'])
             ? htmlspecialchars($row['DefaultValue'])
             : '') . '"'
@@ -831,13 +833,13 @@ function addField()
 if ($action == 'tbl_create.php') {
     $html .= '<table>'
         . '<tr class="vtop">'
-        . '<th>' . __('Table comments') . ':&nbsp;</th>'
+        . '<th>' . __('Table comments:') . '</th>'
         . '<td width="25">&nbsp;</td>'
-        . '<th>' . __('Storage Engine') . ':'
+        . '<th>' . __('Storage Engine:')
         . PMA_Util::showMySQLDocu('Storage_engines', 'Storage_engines')
         . '</th>'
         . '<td width="25">&nbsp;</td>'
-        . '<th>' . __('Collation') . ':&nbsp;</th>'
+        . '<th>' . __('Collation:') . '</th>'
         . '</tr>'
         . '<tr><td><input type="text" name="comment" size="40" maxlength="80"'
         . 'value="'
@@ -871,7 +873,7 @@ if ($action == 'tbl_create.php') {
 
     if (PMA_Partition::havePartitioning()) {
         $html .= '<tr class="vtop">'
-            . '<th>' . __('PARTITION definition') . ':&nbsp;'
+            . '<th>' . __('PARTITION definition:') . '&nbsp;'
             . PMA_Util::showMySQLDocu('Partitioning', 'Partitioning')
             . '</th>'
             . '</tr>'
