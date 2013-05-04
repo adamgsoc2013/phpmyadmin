@@ -728,9 +728,9 @@ function savePrefsToLocalStorage(form)
             submit_get_json: true
         },
         success: function (response) {
-            window.localStorage['config'] = response.prefs;
-            window.localStorage['config_mtime'] = response.mtime;
-            window.localStorage['config_mtime_local'] = (new Date()).toUTCString();
+            window.localStorage.config = response.prefs;
+            window.localStorage.config_mtime = response.mtime;
+            window.localStorage.config_mtime_local = (new Date()).toUTCString();
             updatePrefsDate();
             $('div.localStorage-empty').hide();
             $('div.localStorage-exists').show();
@@ -750,7 +750,7 @@ function savePrefsToLocalStorage(form)
  */
 function updatePrefsDate()
 {
-    var d = new Date(window.localStorage['config_mtime_local']);
+    var d = new Date(window.localStorage.config_mtime_local);
     var msg = PMA_messages.strSavedOn.replace('@DATE@', formatDate(d));
     $('#opts_import_local_storage div.localStorage-exists').html(msg);
 }
@@ -774,7 +774,7 @@ function formatDate(d)
  */
 function offerPrefsAutoimport()
 {
-    var has_config = (window.localStorage || false) && (window.localStorage['config'] || false);
+    var has_config = (window.localStorage || false) && (window.localStorage.config || false);
     var cnt = $('#prefs_autoload');
     if (!cnt.length || !has_config) {
         return;
@@ -790,7 +790,7 @@ function offerPrefsAutoimport()
             });
             return;
         }
-        cnt.find('input[name=json]').val(window.localStorage['config']);
+        cnt.find('input[name=json]').val(window.localStorage.config);
         cnt.find('form').submit();
     });
     cnt.show();
