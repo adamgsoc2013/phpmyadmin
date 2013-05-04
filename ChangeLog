@@ -7,6 +7,7 @@ phpMyAdmin - ChangeLog
 + Break server_status.php functions into smaller functions
 + PMA_DBI functions in database_interface.lib.php renamed to be compliant with PEAR standards
 + [interface] Make warning about existing config directory clearer
++ rfe #1414 Allow specifying controlport
 
 4.0.1.0 (not yet released)
 - bug #3879 Import broken for CSV using LOAD DATA
@@ -22,7 +23,7 @@ phpMyAdmin - ChangeLog
 - bug #3901 Setup script warning for config auth (stored login data) shows link BBcode
 - bug #3895 [browse] Fixed getting BLOB data
 
-4.0.0.0 (not yet released)
+4.0.0.0 (2013-05-03)
 + Patch #3481047 for rfe #3480477 Insert as new row enhancement
 + Patch #3480999 Activate codemirror in the query window
 - Patch #3495284 XML Import - fix message and redirect
@@ -134,8 +135,6 @@ underscore
 - [security] Global variables overwrite in export.php, reported by Janek Vind
   (see PMASA-2013-5)
 - bug #3892 [export] SQL Export files are empty
-
-3.5.9.0 (not yet released)
 
 3.5.8.1 (2013-04-24)
 - [security] Remote code execution (preg_replace), reported by Janek Vind
