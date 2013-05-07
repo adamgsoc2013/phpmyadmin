@@ -33,18 +33,11 @@ class Node_Column_Test extends PHPUnit_Framework_TestCase
         );
     }
 
-    public function testAddNode()
+    public function testComment()
     {
-        $parent = PMA_NodeFactory::getInstance('Node_Column', 'parent');
-        $child = PMA_NodeFactory::getInstance('Node_Column', 'child');
-        $parent->addChild($child);
-        $this->assertEquals(
-            $parent->getChild($child->name),
-            $child
-        );
-        $this->assertEquals(
-            $parent->getChild($child->real_name, true),
-            $child
+        $this->assertContains(
+            'text',
+            PMA_NodeFactory::getInstance('Node_Column')->getComment()
         );
     }
 }
